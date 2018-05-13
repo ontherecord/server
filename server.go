@@ -40,7 +40,8 @@ func handleMessagesNew(w http.ResponseWriter, r *http.Request) {
 	})
 	glog.Infof("Created %+v", block)
 
-	if err := chain.Add(block); err != nil {
+	block, err := chain.Add(block)
+	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		io.WriteString(w, fmt.Sprint(err))
 		glog.Error(err)

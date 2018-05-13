@@ -10,8 +10,7 @@ import (
 type Chain struct {
 	Id uuid.UUID
 
-	// TODO: Maybe store as value copies to assert ownership.
-	blocks []*Block
+	blocks []Block
 }
 
 func NewChain() (c Chain) {
@@ -28,7 +27,7 @@ func NewChain() (c Chain) {
 		},
 	)
 
-	c.blocks = []*Block{block}
+	c.blocks = []Block{block}
 	return
 }
 
@@ -49,16 +48,16 @@ func (c Chain) IsValid() bool {
 }
 
 func (c Chain) Last() Block {
-	return *c.blocks[len(c.blocks)-1]
+	return c.blocks[len(c.blocks)-1]
 }
 
-func (c Chain) Add(block *Block) error {
+func (c Chain) Add(block Block) (Block, error) {
 	if len(c.blocks) == 0 {
-		return fmt.Errorf("chain has not been initialized")
+		return block, fmt.Errorf("chain has not been initialized")
 	}
 
 	block.Index = c.Last().Index + 1
 	block.Previous = c.Last().Hash()
 	c.blocks = append(c.blocks, block)
-	return nil
+	return block, nil
 }

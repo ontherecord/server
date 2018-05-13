@@ -21,8 +21,8 @@ type Block struct {
 	Previous  Hash
 }
 
-func NewBlock(message Message) *Block {
-	return &Block{
+func NewBlock(message Message) Block {
+	return Block{
 		Timestamp: time.Now().Unix(),
 		Message:   message,
 	}
