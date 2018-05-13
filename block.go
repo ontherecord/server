@@ -21,23 +21,11 @@ type Block struct {
 	Previous  Hash
 }
 
-func NewBlock(message Message) Block {
-	var hash Hash
-	var index Index
-	if len(chain) > 0 {
-		index = chain[len(chain)-1].Index + 1
-		hash = chain[len(chain)-1].Hash()
-	}
-
-	block := Block{
-		Index:     index,
+func NewBlock(message Message) *Block {
+	return &Block{
 		Timestamp: time.Now().Unix(),
 		Message:   message,
-		Previous:  hash,
 	}
-	chain = append(chain, block)
-
-	return block
 }
 
 // Hash creates a SHA-256 hash of the Block.
