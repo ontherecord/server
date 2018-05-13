@@ -9,16 +9,19 @@ import (
 type Index int64
 type Hash string
 
-type Block struct {
-	Index        Index
-	Timestamp    int64
-	Transactions []Transaction
-	Proof        Proof
-	Previous     Hash
+type Message struct {
+	Sender, Receiver, Room string
+	Text                   string
 }
 
-// NewBlock creates a block in the block chain, given the proof.
-func NewBlock(proof Proof) Block {
+type Block struct {
+	Index     Index
+	Timestamp int64
+	Message   Message
+	Previous  Hash
+}
+
+func NewBlock(message Message) Block {
 	var hash Hash
 	var index Index
 	if len(chain) > 0 {
@@ -27,16 +30,12 @@ func NewBlock(proof Proof) Block {
 	}
 
 	block := Block{
-		Index:        index,
-		Timestamp:    time.Now().Unix(),
-		Transactions: transactions,
-		Proof:        proof,
-		Previous:     hash,
+		Index:     index,
+		Timestamp: time.Now().Unix(),
+		Message:   message,
+		Previous:  hash,
 	}
 	chain = append(chain, block)
-
-	// Reset current transactions.
-	transactions = []Transaction{}
 
 	return block
 }

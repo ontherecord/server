@@ -13,13 +13,12 @@ import (
 var (
 	port = flag.Int("port", 8023, "The port on which to listen.")
 
-	chain        []Block
-	transactions []Transaction
-	nodeID       uuid.UUID
+	chain  []Block
+	nodeID uuid.UUID
 )
 
-func handleTransactionsNew(w http.ResponseWriter, r *http.Request) {
-	glog.Infof("Creating transaction")
+func handleMessagesNew(w http.ResponseWriter, r *http.Request) {
+	glog.Infof("Creating message")
 
 	if r.Method != http.MethodPost {
 		w.WriteHeader(http.StatusMethodNotAllowed)
@@ -33,40 +32,27 @@ func handleTransactionsNew(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	index := NewTransaction(r.FormValue("sender"), r.FormValue("receiver"), r.FormValue("room"), r.FormValue("message"))
-	glog.Infof("Created %d", index)
+	block := NewBlock(Message{
+		Sender:   r.FormValue("sender"),
+		Receiver: r.FormValue("receiver"),
+		Room:     r.FormValue("room"),
+		Text:     r.FormValue("text"),
+	})
+	glog.Infof("Created %+v", block)
 
 	w.WriteHeader(http.StatusCreated)
-	io.WriteString(w, fmt.Sprint(index))
+	io.WriteString(w, fmt.Sprintf("%d", block.Index))
 }
 
-func handleMine(w http.ResponseWriter, r *http.Request) {
-	glog.Infof("Mining")
+func handleMessagesList(w http.ResponseWriter, r *http.Request) {
+	glog.Infof("Returning chain of messages")
 
 	if r.Method != http.MethodGet {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
 
-	proof := NewProof(chain[len(chain)-1].Proof)
-
-	NewTransaction("", nodeID.String(), "", "")
-	block := NewBlock(proof)
-
-	glog.Infof("Mined %+v", block)
-
-	// TODO(dominic): JSON
-	io.WriteString(w, fmt.Sprintf("%+v", block))
-}
-
-func handleChain(w http.ResponseWriter, r *http.Request) {
-	glog.Infof("Returning chain")
-
-	if r.Method != http.MethodGet {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		return
-	}
-
+	// TODO: JSON?
 	io.WriteString(w, fmt.Sprintf("%+v", chain))
 }
 
@@ -81,15 +67,19 @@ func handleNodesResolve(w http.ResponseWriter, r *http.Request) {
 func main() {
 	flag.Parse()
 
-	// Create the genesis block and a node ID for this node.
-	NewBlock(NewProof(42))
 	nodeID = uuid.New()
 	glog.Infof("Node ID: %s", nodeID.String())
 
+	// Create the genesis block and a node ID for this node.
+	NewBlock(Message{
+		Sender:   nodeID.String(),
+		Receiver: nodeID.String(),
+		Text:     "[genesis]",
+	})
+
 	// Chain handlers
-	http.HandleFunc("/transactions/new", handleTransactionsNew)
-	http.HandleFunc("/mine", handleMine)
-	http.HandleFunc("/chain", handleChain)
+	http.HandleFunc("/messages/new", handleMessagesNew)
+	http.HandleFunc("/messages/list", handleMessagesList)
 
 	// Node handlers
 	http.HandleFunc("/nodes/register", handleNodesRegister)
