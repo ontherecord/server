@@ -6,12 +6,16 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"path"
+	"strings"
+	"time"
 
 	"github.com/golang/glog"
 )
 
 var (
-	port = flag.Int("port", 8023, "The port on which to listen.")
+	port        = flag.Int("port", 8023, "The port on which to listen.")
+	resolveTime = flag.Duration("resolve", 1*time.Minute, "How often to resolve chains")
 
 	chain Chain
 	nodes map[url.URL]bool
@@ -66,7 +70,6 @@ func handleMessagesList(w http.ResponseWriter, r *http.Request) {
 
 func handleNodesRegister(w http.ResponseWriter, r *http.Request) {
 	glog.Infof("Registering node")
-	glog.Infof("%+v", *r)
 
 	if r.Method != http.MethodPost {
 		w.WriteHeader(http.StatusMethodNotAllowed)
@@ -79,12 +82,10 @@ func handleNodesRegister(w http.ResponseWriter, r *http.Request) {
 		glog.Error(err)
 		return
 	}
-	glog.Infof("%+v", r.Form)
-	glog.Infof("%+v", r.PostForm)
 
 	glog.Infof("Registering address %q", r.FormValue("address"))
 
-	nodeUrl, err := url.Parse(r.FormValue("address"))
+	nodeUrl, err := url.ParseRequestURI(r.FormValue("address"))
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		io.WriteString(w, fmt.Sprint(err))
@@ -92,13 +93,17 @@ func handleNodesRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !strings.HasPrefix(nodeUrl.Scheme, "http") {
+		w.WriteHeader(http.StatusBadRequest)
+		io.WriteString(w, "Address must start with 'http'")
+		glog.Errorf("Address %q doesn't start with 'http'", nodeUrl)
+		return
+	}
+
 	nodes[*nodeUrl] = true
 	glog.Infof("Registered node %q", nodeUrl.String())
 
 	w.WriteHeader(http.StatusAccepted)
-}
-
-func handleNodesResolve(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleNodesList(w http.ResponseWriter, r *http.Request) {
@@ -113,6 +118,22 @@ func handleNodesList(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, fmt.Sprintf("%+v", nodes))
 }
 
+func resolve() {
+	glog.Infof("Resolving")
+	// TODO: lock 'nodes' while resolving
+	for node := range nodes {
+		glog.Infof("Resolving %q", node.String())
+		_, err := http.Get(path.Join(node.Path, "/messages/list"))
+
+		if err != nil {
+			glog.Error(err)
+			continue
+		}
+
+		// TODO: once it's JSON, marshal and resolve if valid.
+	}
+}
+
 func main() {
 	flag.Parse()
 
@@ -125,8 +146,13 @@ func main() {
 
 	// Node handlers
 	http.HandleFunc("/nodes/register", handleNodesRegister)
-	http.HandleFunc("/nodes/resolve", handleNodesResolve)
 	http.HandleFunc("/nodes/list", handleNodesList)
+
+	go func() {
+		for _ = range time.Tick(*resolveTime) {
+			resolve()
+		}
+	}()
 
 	glog.Infof("Running at http://localhost:%d", *port)
 	if err := http.ListenAndServe(fmt.Sprintf(":%d", *port), nil); err != nil {
