@@ -10,7 +10,7 @@ import (
 type Chain struct {
 	Id uuid.UUID
 
-	blocks []Block
+	Blocks []Block
 }
 
 func NewChain() (c Chain) {
@@ -27,12 +27,12 @@ func NewChain() (c Chain) {
 		},
 	)
 
-	c.blocks = []Block{block}
+	c.Blocks = []Block{block}
 	return
 }
 
 func (c Chain) IsValid() bool {
-	for i, b := range c.blocks {
+	for i, b := range c.Blocks {
 		if b.Index != Index(i) {
 			return false
 		}
@@ -40,7 +40,7 @@ func (c Chain) IsValid() bool {
 			if b.Previous != "" {
 				return false
 			}
-		} else if b.Previous != c.blocks[i-1].Hash() {
+		} else if b.Previous != c.Blocks[i-1].Hash() {
 			return false
 		}
 	}
@@ -48,16 +48,16 @@ func (c Chain) IsValid() bool {
 }
 
 func (c Chain) Last() Block {
-	return c.blocks[len(c.blocks)-1]
+	return c.Blocks[len(c.Blocks)-1]
 }
 
 func (c Chain) Add(block Block) (Block, error) {
-	if len(c.blocks) == 0 {
+	if len(c.Blocks) == 0 {
 		return block, fmt.Errorf("chain has not been initialized")
 	}
 
 	block.Index = c.Last().Index + 1
 	block.Previous = c.Last().Hash()
-	c.blocks = append(c.blocks, block)
+	c.Blocks = append(c.Blocks, block)
 	return block, nil
 }

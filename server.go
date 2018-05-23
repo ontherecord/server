@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -21,6 +22,12 @@ var (
 	nodes map[url.URL]bool
 )
 
+func handleError(w http.ResponseWriter, err error, statusCode int) {
+	w.WriteHeader(statusCode)
+	io.WriteString(w, err.Error())
+	glog.Error(err)
+}
+
 func handleMessagesNew(w http.ResponseWriter, r *http.Request) {
 	glog.Infof("Creating message")
 
@@ -30,9 +37,7 @@ func handleMessagesNew(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := r.ParseForm(); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		io.WriteString(w, fmt.Sprint(err))
-		glog.Error(err)
+		handleError(w, err, http.StatusBadRequest)
 		return
 	}
 
@@ -46,9 +51,7 @@ func handleMessagesNew(w http.ResponseWriter, r *http.Request) {
 
 	block, err := chain.Add(block)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		io.WriteString(w, fmt.Sprint(err))
-		glog.Error(err)
+		handleError(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -64,8 +67,12 @@ func handleMessagesList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: JSON?
-	io.WriteString(w, fmt.Sprintf("%+v", chain))
+	bytes, err := json.Marshal(chain)
+	if err != nil {
+		handleError(w, err, http.StatusInternalServerError)
+		return
+	}
+	io.WriteString(w, string(bytes))
 }
 
 func handleNodesRegister(w http.ResponseWriter, r *http.Request) {
@@ -77,9 +84,7 @@ func handleNodesRegister(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := r.ParseForm(); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		io.WriteString(w, fmt.Sprint(err))
-		glog.Error(err)
+		handleError(w, err, http.StatusBadRequest)
 		return
 	}
 
@@ -87,16 +92,12 @@ func handleNodesRegister(w http.ResponseWriter, r *http.Request) {
 
 	nodeUrl, err := url.ParseRequestURI(r.FormValue("address"))
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		io.WriteString(w, fmt.Sprint(err))
-		glog.Error(err)
+		handleError(w, err, http.StatusBadRequest)
 		return
 	}
 
 	if !strings.HasPrefix(nodeUrl.Scheme, "http") {
-		w.WriteHeader(http.StatusBadRequest)
-		io.WriteString(w, "Address must start with 'http'")
-		glog.Errorf("Address %q doesn't start with 'http'", nodeUrl)
+		handleError(w, fmt.Errorf("address %q should start with 'http'", nodeUrl), http.StatusBadRequest)
 		return
 	}
 
@@ -114,8 +115,17 @@ func handleNodesList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: JSON?
-	io.WriteString(w, fmt.Sprintf("%+v", nodes))
+	keys := []string{}
+	for node := range nodes {
+		keys = append(keys, node.String())
+	}
+
+	bytes, err := json.Marshal(keys)
+	if err != nil {
+		handleError(w, err, http.StatusInternalServerError)
+		return
+	}
+	io.WriteString(w, string(bytes))
 }
 
 func resolve() {
@@ -123,7 +133,8 @@ func resolve() {
 	// TODO: lock 'nodes' while resolving
 	for node := range nodes {
 		glog.Infof("Resolving %q", node.String())
-		_, err := http.Get(path.Join(node.Path, "/messages/list"))
+		node.Path = path.Join(node.Path, "/messages/list")
+		_, err := http.Get(node.String())
 
 		if err != nil {
 			glog.Error(err)
