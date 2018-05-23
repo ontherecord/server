@@ -8,22 +8,21 @@ import (
 )
 
 type Chain struct {
-	Id uuid.UUID
-
+	Id     uuid.UUID
 	Blocks []Block
 }
 
-func NewChain() (c Chain) {
-	c.Id = uuid.New()
+func NewChain() (c *Chain) {
+	c = &Chain{Id: uuid.New()}
 
 	glog.Infof("Chain ID: %s", c.Id.String())
 
 	// Create the genesis block and a node ID for this node.
 	block := NewBlock(
 		Message{
-			Sender:   c.Id.String(),
-			Receiver: c.Id.String(),
-			Text:     "[genesis]",
+			From: c.Id.String(),
+			To:   c.Id.String(),
+			Text: "[genesis]",
 		},
 	)
 
@@ -51,7 +50,7 @@ func (c Chain) Last() Block {
 	return c.Blocks[len(c.Blocks)-1]
 }
 
-func (c Chain) Add(block Block) (Block, error) {
+func (c *Chain) Add(block Block) (Block, error) {
 	if len(c.Blocks) == 0 {
 		return block, fmt.Errorf("chain has not been initialized")
 	}

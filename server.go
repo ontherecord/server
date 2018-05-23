@@ -18,7 +18,7 @@ var (
 	port        = flag.Int("port", 8023, "The port on which to listen.")
 	resolveTime = flag.Duration("resolve", 1*time.Minute, "How often to resolve chains")
 
-	chain Chain
+	chain *Chain
 	nodes map[url.URL]bool
 )
 
@@ -42,10 +42,10 @@ func handleMessagesNew(w http.ResponseWriter, r *http.Request) {
 	}
 
 	block := NewBlock(Message{
-		Sender:   r.FormValue("sender"),
-		Receiver: r.FormValue("receiver"),
-		Room:     r.FormValue("room"),
-		Text:     r.FormValue("text"),
+		From: r.FormValue("from"),
+		To:   r.FormValue("to"),
+		Room: r.FormValue("room"),
+		Text: r.FormValue("text"),
 	})
 	glog.Infof("Created %+v", block)
 
