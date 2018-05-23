@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"path"
@@ -128,20 +129,44 @@ func handleNodesList(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, string(bytes))
 }
 
+func resolveLoop() {
+	glog.Infof("Starting resolve loop on %v timer", *resolveTime)
+	c := time.Tick(*resolveTime)
+	for now := range c {
+		glog.Infof("Running resolve at %v", now)
+		resolve()
+	}
+}
+
 func resolve() {
-	glog.Infof("Resolving")
 	// TODO: lock 'nodes' while resolving
 	for node := range nodes {
 		glog.Infof("Resolving %q", node.String())
 		node.Path = path.Join(node.Path, "/messages/list")
-		_, err := http.Get(node.String())
+		resp, err := http.Get(node.String())
 
 		if err != nil {
 			glog.Error(err)
 			continue
 		}
 
-		// TODO: once it's JSON, marshal and resolve if valid.
+		defer resp.Body.Close()
+		body, err := ioutil.ReadAll(resp.Body)
+
+		var c Chain
+		err = json.Unmarshal(body, &c)
+
+		if err != nil {
+			glog.Error(err)
+			continue
+		}
+
+		if !c.IsValid() {
+			glog.Warning(fmt.Errorf("skipping invalid chain from %s", node.String()))
+			continue
+		}
+
+		// TODO: now resolve.
 	}
 }
 
@@ -159,11 +184,7 @@ func main() {
 	http.HandleFunc("/nodes/register", handleNodesRegister)
 	http.HandleFunc("/nodes/list", handleNodesList)
 
-	go func() {
-		for _ = range time.Tick(*resolveTime) {
-			resolve()
-		}
-	}()
+	go resolveLoop()
 
 	glog.Infof("Running at http://localhost:%d", *port)
 	if err := http.ListenAndServe(fmt.Sprintf(":%d", *port), nil); err != nil {
